@@ -1,6 +1,5 @@
 import pytest
 import requests
-<<<<<<< HEAD
 import allure
 
 from data import MAIN_URL, CREATE_COURIER_URL, LOGIN_COURIER_URL
