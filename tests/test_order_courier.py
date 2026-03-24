@@ -1,39 +1,87 @@
 import allure
 import pytest
 import requests
-from helpers import generate_password, generate_login
-from data import MAIN_URL, LOGIN, PASSWORD
+
+from data import MAIN_URL, LOGIN_COURIER_URL, ERROR_MESSAGES
+from helpers import generate_login, generate_password
 
 
 class TestLoginCourier:
 
-    @allure.title('Выполнить логин с логином и паролем')
-    def test_login_courier_with_login_password_true(self, create_courier):
-        payload = {"login": LOGIN, "password": PASSWORD}
-        response = requests.post(f'{MAIN_URL}/api/v1/courier/login', data=payload)
-        id_courier = response.json()['id']
+    @allure.title("Успешный логин курьера возвращает id")
+    def test_login_courier_success_return_id(self, new_create_courier):
+        payload = {
+            "login": new_create_courier["login"],
+            "password": new_create_courier["password"]
+        }
 
-        assert response.status_code == 200 and response.json()['id'] == id_courier
+        with allure.step("Логин существующего курьера"):
+            response = requests.post(
+                f"{MAIN_URL}{LOGIN_COURIER_URL}",
+                json=payload,
+                timeout=10
+            )
 
-    @allure.title('Выполнить логин с несуществующим логином и паролем')
-    def test_login_courier_with_bad_login_password_return_message_error(self):
-        payload = {"login": generate_login(), "password": generate_password()}
-        response = requests.post(f'{MAIN_URL}/api/v1/courier/login', data=payload)
+        assert response.status_code == 200
+        assert "id" in response.json()
 
-        assert response.status_code == 404 and response.json() == {'code': 404, 'message': 'Учетная запись не найдена'}
+    @allure.title("Логин существующего курьера с неверным паролем возвращает ошибку")
+    def test_login_existing_courier_with_wrong_password(self, new_create_courier):
+        payload = {
+            "login": new_create_courier["login"],
+            "password": generate_password()
+        }
 
-    @allure.title('Выполнить логин без логина или пароля')
-    @pytest.mark.parametrize('login_courier, password_courier', [[generate_login(), ''], ['', generate_password()]])
-    def test_login_courier_without_login_or_password_return_message_error(self, login_courier, password_courier):
-        payload = {"login": login_courier, "password": password_courier}
-        response = requests.post(f'{MAIN_URL}/api/v1/courier/login', data=payload)
+        with allure.step("Логин существующего пользователя с неверным паролем"):
+            response = requests.post(
+                f"{MAIN_URL}{LOGIN_COURIER_URL}",
+                json=payload,
+                timeout=10
+            )
 
-        assert response.status_code == 400 and response.json() == {'code': 400, 'message': 'Недостаточно данных для входа'}
+        assert response.status_code == 404
+        assert response.json() == ERROR_MESSAGES["LOGIN_FAILED"]
 
-    @allure.title('Логин возвращает идентификатор курьера')
-    def test_login_courier_return_id_courier(self, create_courier):
-        payload = {"login": LOGIN, "password": PASSWORD}
-        response = requests.post(f'{MAIN_URL}/api/v1/courier/login', data=payload)
-        id_courier = response.json()['id']
+    @allure.title("Логин несуществующего пользователя возвращает ошибку")
+    def test_login_non_existent_user(self):
+        payload = {
+            "login": generate_login(),
+            "password": generate_password()
+        }
 
-        assert response.json()['id'] == id_courier
+        with allure.step("Логин полностью несуществующего пользователя"):
+            response = requests.post(
+                f"{MAIN_URL}{LOGIN_COURIER_URL}",
+                json=payload,
+                timeout=10
+            )
+
+        assert response.status_code == 404
+        assert response.json() == ERROR_MESSAGES["LOGIN_FAILED"]
+
+    @allure.title("Логин без логина или пароля возвращает ошибку 400")
+    @pytest.mark.parametrize(
+        "login_value,password_value",
+        [
+            ("", generate_password()),
+            (generate_login(), ""),
+            ("", "")
+        ]
+    )
+    def test_login_without_login_or_password(self, login_value, password_value):
+        payload = {
+            "login": login_value,
+            "password": password_value
+        }
+
+        with allure.step(
+            f"Логин без обязательных данных: login={login_value}, password={password_value}"
+        ):
+            response = requests.post(
+                f"{MAIN_URL}{LOGIN_COURIER_URL}",
+                json=payload,
+                timeout=10
+            )
+
+        assert response.status_code == 400
+        assert response.json() == ERROR_MESSAGES["LOGIN_INSUFFICIENT_DATA"]

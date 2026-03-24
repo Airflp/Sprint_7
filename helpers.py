@@ -1,27 +1,30 @@
 import datetime
 import random
+import uuid
 
 from faker import Faker
 
+fake = Faker("ru_RU")
+
 
 def generate_first_name():
-    return Faker().first_name()
+    return fake.first_name()
 
 
 def generate_password():
-    return Faker().password(length=5, special_chars=True, digits=True, upper_case=True, lower_case=True)
+    return f"Pwd_{uuid.uuid4().hex[:10]}!"
 
 
 def generate_login():
-    return Faker().user_name()
+    return f"courier_{uuid.uuid4().hex[:12]}"
 
 
 def generate_last_name():
-    return Faker().last_name()
+    return fake.last_name()
 
 
 def generate_address():
-    return Faker().street_address()
+    return fake.street_address()
 
 
 def generate_metro_station():
@@ -29,7 +32,7 @@ def generate_metro_station():
 
 
 def generate_phone():
-    return Faker().phone_number()
+    return "+79" + "".join(str(random.randint(0, 9)) for _ in range(9))
 
 
 def generate_rent_time():
@@ -41,14 +44,11 @@ def generate_delivery_date():
 
 
 def generate_comment():
-    return Faker().text(max_nb_chars=100)
+    return fake.text(max_nb_chars=100)
 
 
 def generate_color():
-    list_color = []
-    random_color = random.choice(['BLACK', 'GREY'])
-    list_color.append(random_color)
-    return list_color
+    return [random.choice(["BLACK", "GREY"])]
 
 
 def generate_limit_orders():

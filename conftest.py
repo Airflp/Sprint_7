@@ -1,31 +1,49 @@
+﻿import allure
 import pytest
 import requests
-import allure
 
 from data import MAIN_URL, CREATE_COURIER_URL, LOGIN_COURIER_URL
-from helpers import generate_login, generate_password, generate_first_name
+from helpers import generate_first_name, generate_login, generate_password
 
 
 @pytest.fixture(scope="function")
-@allure.step("Создание курьера + автоматическая очистка")
-def create_courier(request):
-    """Возвращает словарь сразу (без yield). Очистка через addfinalizer."""
-    payload = {
-        "login": generate_login(),
-        "password": generate_password(),
-        "firstName": generate_first_name()
-    }
+def new_create_courier():
+    with allure.step("Подготовка данных нового курьера"):
+        payload = {
+            "login": generate_login(),
+            "password": generate_password(),
+            "firstName": generate_first_name()
+        }
 
-    # Создаём курьера
-    requests.post(f"{MAIN_URL}{CREATE_COURIER_URL}", json=payload)
+    with allure.step("Создание курьера"):
+        create_response = requests.post(
+            f"{MAIN_URL}{CREATE_COURIER_URL}",
+            json=payload,
+            timeout=10
+        )
+        assert create_response.status_code == 201, (
+            f"Не удалось создать курьера: "
+            f"status={create_response.status_code}, body={create_response.text}"
+        )
 
-    # Получаем id
-    login_resp = requests.post(
-        f"{MAIN_URL}{LOGIN_COURIER_URL}",
-        json={"login": payload["login"], "password": payload["password"]}
-    )
+    with allure.step("Авторизация созданного курьера для получения id"):
+        login_response = requests.post(
+            f"{MAIN_URL}{LOGIN_COURIER_URL}",
+            json={
+                "login": payload["login"],
+                "password": payload["password"]
+            },
+            timeout=10
+        )
+        assert login_response.status_code == 200, (
+            f"Не удалось авторизовать созданного курьера: "
+            f"status={login_response.status_code}, body={login_response.text}"
+        )
 
-    courier_id = login_resp.json().get("id") if login_resp.status_code == 200 else None
+        courier_id = login_response.json().get("id")
+        assert courier_id is not None, (
+            f"В ответе на логин отсутствует id: {login_response.text}"
+        )
 
     courier_info = {
         "login": payload["login"],
@@ -34,34 +52,10 @@ def create_courier(request):
         "id": courier_id
     }
 
-    # Очистка после теста
-    def cleanup():
-        if courier_info["id"]:
-            requests.delete(f"{MAIN_URL}{CREATE_COURIER_URL}/{courier_info['id']}")
+    yield courier_info
 
-    request.addfinalizer(cleanup)
-
-    return courier_info
-=======
-
-from data import MAIN_URL, LOGIN, PASSWORD, CREATE_COURIER_URL, LOGIN_COURIER_URL, FIRST_NAME
-
-
-@pytest.fixture()
-def delete_courier():
-    yield
-    # Получить id курьера
-    payload = {"login": LOGIN, "password": PASSWORD}
-    response = requests.post(f'{MAIN_URL}{LOGIN_COURIER_URL}', data=payload)
-    id_courier = response.json()['id']
-
-    # Удалить курьера, который был создан
-    requests.delete(f'{MAIN_URL}{CREATE_COURIER_URL}/{id_courier}')
-
-
-@pytest.fixture()
-def create_courier():
-    # Создать нового курьера
-    payload = {"login": LOGIN, "password": PASSWORD, "firstName": FIRST_NAME}
-    requests.post(f'{MAIN_URL}{CREATE_COURIER_URL}', data=payload)
->>>>>>> 1c8f3abdddd388d6153b5b0534cd7327089e65e4
+    with allure.step("Удаление курьера после теста"):
+        requests.delete(
+            f"{MAIN_URL}{CREATE_COURIER_URL}/{courier_id}",
+            timeout=10
+        )
